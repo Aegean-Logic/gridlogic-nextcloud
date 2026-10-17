@@ -34,3 +34,22 @@
 #gridcraft-status[hidden] {
 	display: none;
 }
+
+#gridcraft-notice {
+	position: absolute;
+	top: 8px;
+	left: 50%;
+	transform: translateX(-50%);
+	z-index: 10;
+	max-width: calc(100% - 32px);
+	padding: 6px 14px;
+	border-radius: var(--border-radius-large, 10px);
+	background: var(--color-main-background);
+	color: var(--color-main-text);
+	box-shadow: 0 2px 8px var(--color-box-shadow);
+	pointer-events: none;
+}
+
+#gridcraft-notice.error {
+	color: var(--color-error-text, var(--color-error));
+}

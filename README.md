@@ -15,17 +15,26 @@ GridLogic (by Aegean Logic, based on [GridCraft](https://github.com/storytold/gr
 - **Formats:** GridLogic saves workbooks as .xlsx. Saving an .ods, .xls, .xlsb or .csv creates
   `<name>.xlsx` next to it and leaves the original untouched.
 
-Not yet: file locking (`files_lock`), read-only shares, public share links, Save As into another
-folder, autosave.
+- **Co-editing:** everyone with the file open edits the same workbook live (GridLogic's
+  `docs/co-editing.md`). The app orders everyone's edits (`/apps/gridcraft/collab/*`, tables
+  `gridcraft_sessions`, `gridcraft_ops`, `gridcraft_members`). GridLogic in each browser merges
+  them. The member with the lowest client id saves the shared workbook to the file every 20 edits
+  or 30 seconds, and on Save. A file changed outside the session (another app, a sync client)
+  ends it: reload to pick the change up. Undo is off while sharing.
+
+Not yet: others' selections on the grid, collaborative undo, read-only shares (edits are refused
+by the server, not prevented in the editor), public share links, file locking (`files_lock`),
+Save As into another folder.
 
 ## Layout
 
 | Path | What |
 |---|---|
 | `appinfo/info.xml` | App manifest |
-| `lib/` | `Application` (Files hook), `EditorController` (`/edit` page and its CSP), listener |
+| `lib/` | `Application` (Files hook), `EditorController` (`/edit` page and its CSP), `CollabController` + `Service/CollabService` (the co-editing sequencer), `Migration/` (its tables), listener |
 | `templates/editor.php`, `css/editor.css` | The editor page |
 | `src/editor.js` | The host page: WebDAV load/save and the GridLogic postMessage bridge |
+| `src/collab.js` | Co-editing: join, op push and polling, checkpoint saves |
 | `src/files.js` | The Files action |
 | `js/` | Bundles built from `src/` (`npm run build`) |
 | `editor/` | The GridLogic web build (`trunk build --release` in `gridcraft/apps/gridcraft-web`) |

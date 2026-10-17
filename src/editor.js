@@ -5,9 +5,12 @@
 import { getCurrentUser, getRequestToken } from '@nextcloud/auth'
 import { generateRemoteUrl } from '@nextcloud/router'
 
+import { Collab } from './collab.js'
+
 const root = document.getElementById('gridcraft-app')
 const status = document.getElementById('gridcraft-status')
 const path = root?.dataset.path ?? ''
+const fileId = Number(root?.dataset.fileId ?? 0)
 const user = getCurrentUser()
 
 /** The folder of `path` and its file name. */
@@ -36,8 +39,29 @@ let dirty = false
 /** The workbook's current name: an imported .csv/.ods becomes .xlsx once saved. */
 let shownName = fileName
 
+/** The co-editing session, once joined. */
+let collab = null
+/** Who else is in it. */
+let others = 0
+
 function showTitle() {
-	document.title = `${dirty ? '• ' : ''}${shownName} - GridLogic`
+	const unsaved = collab ? collab.unsaved : dirty
+	const company = others > 0 ? ` (${others + 1} editing)` : ''
+	document.title = `${unsaved ? '• ' : ''}${shownName}${company} - GridLogic`
+}
+
+/** A message over the top of the editor, not covering it (co-editing). */
+function notify(text, error = false) {
+	let bar = document.getElementById('gridcraft-notice')
+	if (!bar) {
+		bar = document.createElement('div')
+		bar.id = 'gridcraft-notice'
+		root.prepend(bar)
+	}
+	bar.textContent = text
+	bar.classList.toggle('error', error)
+	clearTimeout(bar.timer)
+	bar.timer = setTimeout(() => bar.remove(), error ? 15000 : 5000)
 }
 
 function headers(extra = {}) {
@@ -134,7 +158,11 @@ function start() {
 				console.warn('GridLogic: this build does not confirm saves; a failed save will not be reported')
 			}
 			try {
-				await load(frame)
+				if (message.collab && fileId > 0) {
+					await share(frame)
+				} else {
+					await load(frame)
+				}
 				status.hidden = true
 			} catch (e) {
 				show(`Couldn't open ${fileName}: ${e.message}`, true)
@@ -143,13 +171,31 @@ function start() {
 		case 'gridcraft:save': {
 			let reply
 			try {
-				reply = await store(message)
+				// Shared: Save writes the workbook as everyone has it.
+				if (collab && /\.xls[xm]$/i.test(String(message.name ?? ''))) {
+					await collab.checkpoint()
+					reply = { type: 'gridcraft:saved', id: message.id }
+					showTitle()
+				} else {
+					reply = await store(message)
+				}
 			} catch (e) {
-				reply = { type: 'gridcraft:saveFailed', id: message.id, error: `Couldn't reach Nextcloud: ${e.message}` }
+				reply = { type: 'gridcraft:saveFailed', id: message.id, error: e.message }
 			}
 			frame.contentWindow.postMessage(reply, location.origin)
 			break
 		}
+		case 'gridcraft:collab:op':
+			collab?.queue(message.json)
+			showTitle()
+			break
+		case 'gridcraft:collab:checkpointData':
+			collab?.received(message)
+			break
+		case 'gridcraft:collab:error':
+			console.warn('GridLogic co-editing:', message.error)
+			collab?.rejoin()
+			break
 		case 'gridcraft:dirty':
 			dirty = Boolean(message.dirty)
 			showTitle()
@@ -161,13 +207,37 @@ function start() {
 	})
 
 	addEventListener('beforeunload', (event) => {
-		if (dirty) {
+		if (collab ? collab.unsaved : dirty) {
 			event.preventDefault()
 		}
 	})
 
 	frame.src = editorUrl.toString()
 	root.appendChild(frame)
+}
+
+/** Opens the file in a co-editing session: everyone with it open edits the same workbook. */
+async function share(frame) {
+	collab = new Collab({
+		frame,
+		fileId,
+		fileUrl: davUrl(path),
+		headers,
+		notify,
+		onMembers(members) {
+			const before = others
+			others = Math.max(0, members.length - 1)
+			if (others > before) {
+				const names = members.filter((m) => m.client !== collab.client).map((m) => m.displayName || m.userId)
+				notify(`Editing with ${names.join(', ')}`)
+			}
+			showTitle()
+		},
+	})
+	const { bytes, seq, entries } = await collab.join()
+	frame.contentWindow.postMessage({ type: 'gridcraft:open', name: fileName, bytes }, location.origin, [bytes])
+	collab.start(seq, entries)
+	showTitle()
 }
 
 start()
