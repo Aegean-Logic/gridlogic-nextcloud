@@ -1,7 +1,7 @@
 // Files app: an "Open in GridLogic" action on spreadsheets, the default (click to open) for them.
 
 import { DefaultType, Permission, registerFileAction } from '@nextcloud/files'
-import { generateUrl } from '@nextcloud/router'
+import { generateUrl, getRootUrl } from '@nextcloud/router'
 
 const WORKBOOKS = ['xlsx', 'xlsm', 'ods', 'xls', 'xlsb']
 const TEXT_TABLES = ['csv', 'tsv']
@@ -33,4 +33,19 @@ registerFileAction({
 	},
 	order: -10,
 	default: DefaultType.DEFAULT,
+})
+
+// "Open in GridLogic desktop app": the file in GridLogic on this computer (`gridlogic://open`,
+// as in `editor.js`), signed in to this Nextcloud and co-editing with the browser.
+registerFileAction({
+	id: 'gridcraft-open-desktop',
+	displayName: () => 'Open in GridLogic desktop app',
+	iconSvgInline: () => ICON,
+	enabled: ({ nodes }) => nodes.length === 1 && opens(nodes[0]) && !document.getElementById('isPublic')?.value,
+	async exec({ nodes }) {
+		const server = `${location.origin}${getRootUrl()}`
+		location.href = `gridlogic://open?server=${encodeURIComponent(server)}&path=${encodeURIComponent(nodes[0].path)}`
+		return null
+	},
+	order: -9,
 })

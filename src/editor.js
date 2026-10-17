@@ -157,7 +157,12 @@ function start() {
 	}
 	const editorUrl = new URL(root.dataset.editorUrl, location.href)
 	// Added to the page's own query (`v`, the app version), which keeps browser caches current.
-	for (const [key, value] of Object.entries({ host: 'parent', ack: '1', author: personName })) {
+	const params = { host: 'parent', ack: '1', author: personName }
+	if (!viaLink) {
+		// The workbook can carry on in GridLogic on this computer (Open in Desktop App).
+		params.desktop = '1'
+	}
+	for (const [key, value] of Object.entries(params)) {
 		editorUrl.searchParams.set(key, value)
 	}
 
@@ -224,6 +229,10 @@ function start() {
 			frame.contentWindow.postMessage(reply, location.origin)
 			break
 		}
+		case 'gridcraft:openDesktop':
+			openInDesktop(path)
+			notify('Opening in GridLogic on this computer… If nothing happens, install GridLogic for your computer first.')
+			break
 		case 'gridcraft:collab:selection':
 			collab?.setSelection(message.json)
 			break
@@ -249,6 +258,16 @@ function start() {
 
 	frame.src = editorUrl.toString()
 	root.appendChild(frame)
+}
+
+/**
+ * Opens a file of the user's in GridLogic on this computer: a `gridlogic://open` link with this
+ * Nextcloud's address and the file's path. The desktop app signs in to this server if it isn't
+ * yet, then opens the file in the same co-editing session as this page.
+ */
+export function openInDesktop(filePath) {
+	const server = `${location.origin}${getRootUrl()}`
+	location.href = `gridlogic://open?server=${encodeURIComponent(server)}&path=${encodeURIComponent(filePath)}`
 }
 
 /** Who's editing, above the editor: each person in the colour they're drawn in on the grid. */

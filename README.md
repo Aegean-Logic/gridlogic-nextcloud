@@ -52,7 +52,13 @@ GridLogic (by Aegean Logic, based on [GridCraft](https://github.com/storytold/gr
   (File › Account; the app password goes to the system keychain). File › Open and Save As browse
   Nextcloud over WebDAV. A workbook from Nextcloud is a local copy tied to the file: saving it
   (AutoSave by default) sends it with `If-Match`. If someone else changed the file, the user
-  picks Keep both, Use mine or Use Nextcloud's. The desktop doesn't co-edit live yet.
+  picks Keep both, Use mine or Use Nextcloud's. A workbook opened this way joins the live
+  co-editing session, with the browser and anyone else. The session is reached through the same
+  `/apps/gridcraft/collab/*` routes, with the app password.
+- **Open in Desktop App:** in the editor's title bar, and "Open in GridLogic desktop app" in a
+  spreadsheet's Files menu. Both open the file in the desktop app with a
+  `gridlogic://open?server=…&path=…` link (the installers register the scheme on Windows and
+  Linux, not yet on macOS). The app signs in to that Nextcloud first if it needs to.
 
 Not yet: links to folders (their spreadsheets open in Nextcloud's own viewer), file locking
 (`files_lock`), Save As into another folder.
