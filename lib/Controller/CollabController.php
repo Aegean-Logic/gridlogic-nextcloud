@@ -37,8 +37,9 @@ class CollabController extends Controller {
 		return $this->guard(function () use ($fileId, $etag) {
 			$user = $this->userSession->getUser();
 			$node = $this->file($fileId);
-			$result = $this->collab->join($fileId, $etag, $user->getUID(), $user->getDisplayName());
-			$result['canEdit'] = $node->isUpdateable();
+			$canEdit = $node->isUpdateable();
+			$result = $this->collab->join($fileId, $etag, $user->getUID(), $user->getDisplayName(), $canEdit);
+			$result['canEdit'] = $canEdit;
 			return $result;
 		});
 	}

@@ -79,10 +79,10 @@ export class Collab {
 
 	/** After GridLogic opened the file: start sharing and catching up. */
 	start(seq, entries) {
-		this.post({ type: 'gridcraft:collab:start', client: this.client, seq })
+		this.post({ type: 'gridcraft:collab:start', client: this.client, seq, readOnly: !this.canEdit })
 		this.deliver(entries)
 		if (!this.canEdit) {
-			this.notify('You can view this file but not edit it: your changes won\'t be shared or saved.', true)
+			this.notify('You can view this file but not edit it.')
 		}
 		addEventListener('pagehide', () => this.leave())
 		this.poll()
@@ -119,6 +119,12 @@ export class Collab {
 					this.notify('You can view this file but not edit it: your changes aren\'t shared.', true)
 					this.outbox.length = 0
 				} else if (e.status === 409) {
+					this.rejoin()
+				} else if (e.status === 400) {
+					// Refused for good (too large, or malformed): retrying can't help, and this
+					// copy now differs from everyone else's, so start again from the file.
+					this.notify(`An edit couldn't be shared: ${e.message}`, true)
+					this.outbox.length = 0
 					this.rejoin()
 				} else {
 					// Offline or a hiccup: the server recognises a retried op, so try again.
@@ -208,9 +214,10 @@ export class Collab {
 		return this.lastSeq > this.checkpointSeq || this.outbox.length > 0
 	}
 
-	/** The member with the lowest client id saves, when enough has changed. */
+	/** The editor with the lowest client id saves, when enough has changed. */
 	maybeCheckpoint() {
-		const writer = this.members.length ? Math.min(...this.members.map((m) => m.client)) : this.client
+		const editors = this.members.filter((m) => m.canEdit !== false)
+		const writer = editors.length ? Math.min(...editors.map((m) => m.client)) : this.client
 		const due = this.lastSeq - this.checkpointSeq >= CHECKPOINT_OPS || (this.firstUnsavedAt && Date.now() - this.firstUnsavedAt >= CHECKPOINT_MS)
 		if (writer === this.client && this.lastSeq > this.checkpointSeq && due && this.canEdit) {
 			this.checkpoint().catch((e) => console.warn('GridLogic: checkpoint failed', e))

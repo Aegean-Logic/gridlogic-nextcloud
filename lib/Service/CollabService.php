@@ -40,12 +40,12 @@ class CollabService {
 	 * after that (load it again), otherwise the session, the joiner's client id, the log
 	 * position the loaded file is at, and the log entries after it.
 	 */
-	public function join(int $fileId, string $etag, string $userId, string $displayName): array {
+	public function join(int $fileId, string $etag, string $userId, string $displayName, bool $canEdit = true): array {
 		$etag = self::bareEtag($etag);
 		for ($attempt = 0; ; $attempt++) {
 			$this->db->beginTransaction();
 			try {
-				$result = $this->joinLocked($fileId, $etag, $userId, $displayName);
+				$result = $this->joinLocked($fileId, $etag, $userId, $displayName, $canEdit);
 				if (isset($result['retry'])) {
 					$this->db->rollBack();
 				} else {
@@ -63,7 +63,7 @@ class CollabService {
 		}
 	}
 
-	private function joinLocked(int $fileId, string $etag, string $userId, string $displayName): array {
+	private function joinLocked(int $fileId, string $etag, string $userId, string $displayName, bool $canEdit): array {
 		$now = $this->time->getTime();
 		// Taking a client id locks the session row for the rest of the transaction.
 		$qb = $this->db->getQueryBuilder();
@@ -118,6 +118,7 @@ class CollabService {
 			'user_id' => $qb->createNamedParameter($userId),
 			'display_name' => $qb->createNamedParameter(mb_substr($displayName, 0, 255)),
 			'last_seen' => $qb->createNamedParameter($now, IQueryBuilder::PARAM_INT),
+			'can_edit' => $qb->createNamedParameter($canEdit ? 1 : 0, IQueryBuilder::PARAM_INT),
 		])->executeStatement();
 
 		$from = (int)$session['checkpoint_seq'];
@@ -283,7 +284,7 @@ class CollabService {
 	/** @return list<array{client: int, userId: string, displayName: string}> */
 	private function activeMembers(int $sessionId, int $now): array {
 		$qb = $this->db->getQueryBuilder();
-		$qb->select('client', 'user_id', 'display_name', 'selection')->from('gridcraft_members')
+		$qb->select('client', 'user_id', 'display_name', 'selection', 'can_edit')->from('gridcraft_members')
 			->where($qb->expr()->eq('session_id', $qb->createNamedParameter($sessionId, IQueryBuilder::PARAM_INT)))
 			->andWhere($qb->expr()->gte('last_seen', $qb->createNamedParameter($now - self::ACTIVE_SECONDS, IQueryBuilder::PARAM_INT)))
 			->orderBy('client', 'ASC');
@@ -295,6 +296,7 @@ class CollabService {
 				'userId' => (string)$r['user_id'],
 				'displayName' => (string)$r['display_name'],
 				'selection' => (string)($r['selection'] ?? ''),
+				'canEdit' => (int)($r['can_edit'] ?? 1) === 1,
 			];
 		}
 		$rows->closeCursor();

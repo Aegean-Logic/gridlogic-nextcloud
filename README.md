@@ -25,9 +25,13 @@ GridLogic (by Aegean Logic, based on [GridCraft](https://github.com/storytold/gr
   strip above the editor lists who's editing (positions travel with each poll and are kept in
   `gridcraft_members.selection`).
 - **Undo:** Undo and Redo take back a person's own edits only, never someone else's later change.
+- **View-only access:** someone who can read but not write the file follows the others live; an
+  edit they try is taken back with a message (and the server refuses it too). Only members who
+  can edit save the shared workbook.
+- **Charts, rules, notes:** two people adding a chart, a conditional-format rule or a note at
+  once both keep theirs (they merge item by item).
 
-Not yet: read-only shares (edits are refused by the server, not prevented in the editor), public
-share links, file locking (`files_lock`), Save As into another folder.
+Not yet: public share links, file locking (`files_lock`), Save As into another folder.
 
 ## Layout
 
