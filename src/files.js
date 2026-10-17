@@ -1,4 +1,4 @@
-// Files app: an "Open in GridCraft" action on spreadsheets, the default (click to open) for them.
+// Files app: an "Open in GridLogic" action on spreadsheets, the default (click to open) for them.
 
 import { DefaultType, Permission, registerFileAction } from '@nextcloud/files'
 import { generateUrl } from '@nextcloud/router'
@@ -22,7 +22,7 @@ function opens(node) {
 
 registerFileAction({
 	id: 'gridcraft-open',
-	displayName: () => 'Open in GridCraft',
+	displayName: () => 'Open in GridLogic',
 	iconSvgInline: () => ICON,
 	enabled: ({ nodes }) => nodes.length === 1 && opens(nodes[0]),
 	async exec({ nodes }) {

@@ -24,7 +24,7 @@ class EditorController extends Controller {
 	}
 
 	/**
-	 * The editor page: GridCraft in an iframe on this origin. The page's script reads and
+	 * The editor page: GridLogic in an iframe on this origin. The page's script reads and
 	 * writes the file over WebDAV with the user's session; `path` is relative to their files.
 	 */
 	#[NoAdminRequired]

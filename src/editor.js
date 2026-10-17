@@ -1,6 +1,6 @@
-// The editor page: GridCraft runs in an iframe on this origin (`?host=parent&ack=1`). This page
-// reads the file over WebDAV with the user's session, hands it to GridCraft, and writes back
-// what GridCraft saves. Protocol: gridcraft/packaging/web/README.md.
+// The editor page: GridLogic runs in an iframe on this origin (`?host=parent&ack=1`). This page
+// reads the file over WebDAV with the user's session, hands it to GridLogic, and writes back
+// what GridLogic saves. Protocol: gridcraft/packaging/web/README.md.
 
 import { getCurrentUser, getRequestToken } from '@nextcloud/auth'
 import { generateRemoteUrl } from '@nextcloud/router'
@@ -37,7 +37,7 @@ let dirty = false
 let shownName = fileName
 
 function showTitle() {
-	document.title = `${dirty ? '• ' : ''}${shownName} - GridCraft`
+	document.title = `${dirty ? '• ' : ''}${shownName} - GridLogic`
 }
 
 function headers(extra = {}) {
@@ -58,7 +58,7 @@ async function load(frame) {
 	showTitle()
 }
 
-/** Store a file GridCraft saved next to the opened one. Resolves to the reply for GridCraft. */
+/** Store a file GridLogic saved next to the opened one. Resolves to the reply for GridLogic. */
 async function store(message) {
 	const name = String(message.name ?? '').split(/[\\/]/).pop()
 	if (!name) {
@@ -101,18 +101,18 @@ function start() {
 		return
 	}
 	if (!user) {
-		show('Sign in to Nextcloud to open files in GridCraft.', true)
+		show('Sign in to Nextcloud to open files in GridLogic.', true)
 		return
 	}
 	if (!path) {
-		show('No file to open. Open a spreadsheet from Files with "Open in GridCraft".', true)
+		show('No file to open. Open a spreadsheet from Files with "Open in GridLogic".', true)
 		return
 	}
 	const editorUrl = new URL(root.dataset.editorUrl, location.href)
 	editorUrl.search = new URLSearchParams({ host: 'parent', ack: '1', author: user.displayName ?? user.uid }).toString()
 
 	const frame = document.createElement('iframe')
-	frame.title = 'GridCraft spreadsheet'
+	frame.title = 'GridLogic spreadsheet'
 	frame.allow = 'fullscreen; clipboard-read; clipboard-write'
 	let opened = false
 
@@ -128,7 +128,7 @@ function start() {
 			}
 			opened = true
 			if (!message.ack) {
-				console.warn('GridCraft: this build does not confirm saves; a failed save will not be reported')
+				console.warn('GridLogic: this build does not confirm saves; a failed save will not be reported')
 			}
 			try {
 				await load(frame)
@@ -152,7 +152,7 @@ function start() {
 			showTitle()
 			break
 		case 'gridcraft:failed':
-			show(`GridCraft couldn't start: ${message.error}`, true)
+			show(`GridLogic couldn't start: ${message.error}`, true)
 			break
 		}
 	})

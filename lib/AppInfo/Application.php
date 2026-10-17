@@ -19,7 +19,7 @@ class Application extends App implements IBootstrap {
 	}
 
 	public function register(IRegistrationContext $context): void {
-		// The Files app loads our "Open in GridCraft" action.
+		// The Files app loads our "Open in GridLogic" action.
 		$context->registerEventListener(LoadAdditionalScriptsEvent::class, LoadFilesScripts::class);
 	}
 
