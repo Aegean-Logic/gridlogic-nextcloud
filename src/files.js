@@ -2,6 +2,7 @@
 
 import { DefaultType, Permission, registerFileAction } from '@nextcloud/files'
 import { generateUrl, getRootUrl } from '@nextcloud/router'
+import { getSharingToken, isPublicShare } from '@nextcloud/sharing/public'
 
 const WORKBOOKS = ['xlsx', 'xlsm', 'ods', 'xls', 'xlsb']
 const TEXT_TABLES = ['csv', 'tsv']
@@ -26,7 +27,9 @@ registerFileAction({
 	iconSvgInline: () => ICON,
 	enabled: ({ nodes }) => nodes.length === 1 && opens(nodes[0]),
 	async exec({ nodes }) {
-		const url = new URL(generateUrl('/apps/gridcraft/edit'), location.href)
+		// On a link to a folder, through the link: the path is within the shared folder.
+		const token = isPublicShare() ? getSharingToken() : null
+		const url = new URL(generateUrl(token ? `/apps/gridcraft/s/${encodeURIComponent(token)}/edit` : '/apps/gridcraft/edit'), location.href)
 		url.searchParams.set('path', nodes[0].path)
 		window.location.assign(url.toString())
 		return null
@@ -41,7 +44,7 @@ registerFileAction({
 	id: 'gridcraft-open-desktop',
 	displayName: () => 'Open in GridLogic desktop app',
 	iconSvgInline: () => ICON,
-	enabled: ({ nodes }) => nodes.length === 1 && opens(nodes[0]) && !document.getElementById('isPublic')?.value,
+	enabled: ({ nodes }) => nodes.length === 1 && opens(nodes[0]) && !isPublicShare(),
 	async exec({ nodes }) {
 		const server = `${location.origin}${getRootUrl()}`
 		location.href = `gridlogic://open?server=${encodeURIComponent(server)}&path=${encodeURIComponent(nodes[0].path)}`

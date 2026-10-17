@@ -3,7 +3,8 @@
 // what GridLogic saves. Protocol: gridcraft/packaging/web/README.md.
 //
 // The same page serves shared links (`/s/{token}`, `data-share-token`): the file is then the
-// link's own WebDAV address, and the person is a guest under the name they gave Nextcloud.
+// link's own WebDAV address (a link to a folder: the spreadsheet's address in it,
+// `data-share-path`), and the person is a guest under the name they gave Nextcloud.
 
 import { getCurrentUser, getGuestNickname, getRequestToken } from '@nextcloud/auth'
 import { generateRemoteUrl, generateUrl, getRootUrl } from '@nextcloud/router'
@@ -18,6 +19,8 @@ const fileId = Number(root?.dataset.fileId ?? 0)
 /** A shared link's token: the page is the link's. */
 const token = root?.dataset.shareToken ?? ''
 const viaLink = token !== ''
+/** Through a link to a folder: the spreadsheet's path in it (`/Reports/Budget.xlsx`). */
+const sharePath = root?.dataset.sharePath ?? ''
 /** Whether the link lets people edit (signed-in users: Nextcloud decides on each save). */
 const linkCanEdit = root?.dataset.canEdit === '1'
 const user = getCurrentUser()
@@ -35,7 +38,8 @@ const [folder, fileName] = viaLink ? ['', root?.dataset.fileName ?? ''] : split(
 /** WebDAV URL of a path in the user's files; through a link, the shared file's. */
 function davUrl(p) {
 	if (viaLink) {
-		return `${getRootUrl()}/public.php/dav/files/${encodeURIComponent(token)}`
+		const inFolder = sharePath.split('/').filter(Boolean).map(encodeURIComponent).join('/')
+		return `${getRootUrl()}/public.php/dav/files/${encodeURIComponent(token)}${inFolder ? `/${inFolder}` : ''}`
 	}
 	const encoded = p.split('/').filter(Boolean).map(encodeURIComponent).join('/')
 	return `${generateRemoteUrl(`dav/files/${encodeURIComponent(user.uid)}`)}/${encoded}`
@@ -318,7 +322,7 @@ async function share(frame) {
 		headers,
 		notify,
 		endpoint: viaLink ? generateUrl(`/apps/gridcraft/s/${encodeURIComponent(token)}/collab`) : generateUrl('/apps/gridcraft/collab'),
-		joinParams: viaLink ? { displayName: personName } : {},
+		joinParams: viaLink ? { displayName: personName, path: sharePath } : {},
 		onMembers(members) {
 			others = Math.max(0, members.length - 1)
 			showPeople(members)

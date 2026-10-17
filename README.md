@@ -47,6 +47,11 @@ GridLogic (by Aegean Logic, based on [GridCraft](https://github.com/storytold/gr
   the page reads and writes the file through the link's WebDAV address. Co-editing goes through
   `/apps/gridcraft/s/{token}/collab/*` (`PublicCollabController`). There, membership is a random
   key handed out on join, never stored (only its hash). Guests' Share button copies the link.
+- **Links to folders:** a folder link's page (Nextcloud's Files, public) gets the "Open in
+  GridLogic" action too, as clicking a spreadsheet's default action. It opens
+  `/apps/gridcraft/s/{token}/edit?path=…` (`PublicEditorController`): GridLogic for that file,
+  read and saved through the link's WebDAV address, co-edited like a file link. Paths out of the
+  shared folder find nothing.
 
 - **Desktop app:** GridLogic on Windows, macOS and Linux signs in with Nextcloud's Login Flow
   (File › Account; the app password goes to the system keychain). File › Open and Save As browse
@@ -60,15 +65,14 @@ GridLogic (by Aegean Logic, based on [GridCraft](https://github.com/storytold/gr
   `gridlogic://open?server=…&path=…` link (the installers register the scheme on Windows and
   Linux, not yet on macOS). The app signs in to that Nextcloud first if it needs to.
 
-Not yet: links to folders (their spreadsheets open in Nextcloud's own viewer), file locking
-(`files_lock`), Save As into another folder.
+Not yet: file locking (`files_lock`), Save As into another folder.
 
 ## Layout
 
 | Path | What |
 |---|---|
 | `appinfo/info.xml` | App manifest |
-| `lib/` | `Application` (Files hook, share page provider), `EditorController` (`/edit` page and its CSP), `Share/EditorPageProvider` (shared links), `CollabController`, `PublicCollabController` + `Service/CollabService` (the co-editing sequencer), `Migration/` (its tables), listener |
+| `lib/` | `Application` (Files hook, share page provider), `EditorController` (`/edit` page and its CSP), `Share/EditorPageProvider` (shared links), `PublicEditorController` (spreadsheets in shared folders), `LinkShare` (what's behind a link), `CollabController`, `PublicCollabController` + `Service/CollabService` (the co-editing sequencer), `Migration/` (its tables), listeners |
 | `templates/editor.php`, `css/editor.css` | The editor page |
 | `src/editor.js` | The host page: WebDAV load/save and the GridLogic postMessage bridge |
 | `src/collab.js` | Co-editing: join, op push and polling, checkpoint saves |
