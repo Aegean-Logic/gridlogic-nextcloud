@@ -11,6 +11,7 @@ use OCP\AppFramework\Http\Attribute\NoAdminRequired;
 use OCP\AppFramework\Http\Attribute\NoCSRFRequired;
 use OCP\AppFramework\Http\ContentSecurityPolicy;
 use OCP\AppFramework\Http\TemplateResponse;
+use OCP\App\IAppManager;
 use OCP\IRequest;
 use OCP\IURLGenerator;
 use OCP\Util;
@@ -19,6 +20,7 @@ class EditorController extends Controller {
 	public function __construct(
 		IRequest $request,
 		private IURLGenerator $urlGenerator,
+		private IAppManager $appManager,
 	) {
 		parent::__construct(Application::APP_ID, $request);
 	}
@@ -35,7 +37,10 @@ class EditorController extends Controller {
 		Util::addStyle(Application::APP_ID, 'editor');
 		$response = new TemplateResponse(Application::APP_ID, 'editor', [
 			'path' => $path,
-			'editorUrl' => $this->urlGenerator->linkTo(Application::APP_ID, 'editor/index.html'),
+			// The version in the URL makes browsers fetch the new page after an upgrade: a cached
+			// old one names wasm and script files the upgrade replaced, and wouldn't start.
+			'editorUrl' => $this->urlGenerator->linkTo(Application::APP_ID, 'editor/index.html')
+				. '?v=' . rawurlencode($this->appManager->getAppVersion(Application::APP_ID)),
 		]);
 		$csp = new ContentSecurityPolicy();
 		$csp->addAllowedFrameDomain("'self'");

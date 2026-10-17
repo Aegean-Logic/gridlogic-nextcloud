@@ -109,7 +109,10 @@ function start() {
 		return
 	}
 	const editorUrl = new URL(root.dataset.editorUrl, location.href)
-	editorUrl.search = new URLSearchParams({ host: 'parent', ack: '1', author: user.displayName ?? user.uid }).toString()
+	// Added to the page's own query (`v`, the app version), which keeps browser caches current.
+	for (const [key, value] of Object.entries({ host: 'parent', ack: '1', author: user.displayName ?? user.uid })) {
+		editorUrl.searchParams.set(key, value)
+	}
 
 	const frame = document.createElement('iframe')
 	frame.title = 'GridLogic spreadsheet'
