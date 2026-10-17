@@ -48,6 +48,12 @@ GridLogic (by Aegean Logic, based on [GridCraft](https://github.com/storytold/gr
   `/apps/gridcraft/s/{token}/collab/*` (`PublicCollabController`). There, membership is a random
   key handed out on join, never stored (only its hash). Guests' Share button copies the link.
 
+- **Desktop app:** GridLogic on Windows, macOS and Linux signs in with Nextcloud's Login Flow
+  (File › Account; the app password goes to the system keychain). File › Open and Save As browse
+  Nextcloud over WebDAV. A workbook from Nextcloud is a local copy tied to the file: saving it
+  (AutoSave by default) sends it with `If-Match`. If someone else changed the file, the user
+  picks Keep both, Use mine or Use Nextcloud's. The desktop doesn't co-edit live yet.
+
 Not yet: links to folders (their spreadsheets open in Nextcloud's own viewer), file locking
 (`files_lock`), Save As into another folder.
 
