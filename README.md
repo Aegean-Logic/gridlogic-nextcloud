@@ -20,11 +20,14 @@ GridLogic (by Aegean Logic, based on [GridCraft](https://github.com/storytold/gr
   `gridcraft_sessions`, `gridcraft_ops`, `gridcraft_members`). GridLogic in each browser merges
   them. The member with the lowest client id saves the shared workbook to the file every 20 edits
   or 30 seconds, and on Save. A file changed outside the session (another app, a sync client)
-  ends it: reload to pick the change up. Undo is off while sharing.
+  ends it: reload to pick the change up.
+- **Presence:** everyone's selection shows on the grid in their colour with their name, and a
+  strip above the editor lists who's editing (positions travel with each poll and are kept in
+  `gridcraft_members.selection`).
+- **Undo:** Undo and Redo take back a person's own edits only, never someone else's later change.
 
-Not yet: others' selections on the grid, collaborative undo, read-only shares (edits are refused
-by the server, not prevented in the editor), public share links, file locking (`files_lock`),
-Save As into another folder.
+Not yet: read-only shares (edits are refused by the server, not prevented in the editor), public
+share links, file locking (`files_lock`), Save As into another folder.
 
 ## Layout
 

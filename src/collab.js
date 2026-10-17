@@ -9,6 +9,14 @@ import { generateUrl } from '@nextcloud/router'
 const CHECKPOINT_OPS = 20
 /** …or this long after the first unsaved one. */
 const CHECKPOINT_MS = 30_000
+/** Colours for the people in a session, by client id: legible under white text. */
+const COLORS = ['#C0392B', '#1F6FB2', '#8E44AD', '#B9770E', '#148F77', '#AD1457', '#2E7D32', '#6D4C41']
+
+/** The colour a member is drawn in, on the grid and in the list of who's editing. */
+export function colorFor(client) {
+	return COLORS[(Number(client) - 1) % COLORS.length] ?? COLORS[0]
+}
+
 /** How often to ask for others' edits while the tab is visible, and while it's hidden. */
 const POLL_MS = 600
 const POLL_HIDDEN_MS = 3000
@@ -39,6 +47,9 @@ export class Collab {
 		this.waiting = new Map()
 		this.stopped = false
 		this.canEdit = true
+		/** This person's position from GridLogic (JSON), and the one the server has. */
+		this.selection = ''
+		this.sentSelection = ''
 	}
 
 	/** Loads the file and joins its session. Resolves to the file's bytes once GridLogic can open them. */
@@ -122,10 +133,14 @@ export class Collab {
 	async poll() {
 		while (!this.stopped) {
 			try {
-				const r = await this.call('GET', 'sync', { sessionId: this.sessionId, client: this.client, since: this.lastSeq })
+				const sel = this.selection !== this.sentSelection ? this.selection : ''
+				const r = await this.call('GET', 'sync', { sessionId: this.sessionId, client: this.client, since: this.lastSeq, sel })
 				if (r.rejoin) {
 					this.rejoin()
 					return
+				}
+				if (sel) {
+					this.sentSelection = sel
 				}
 				this.deliver(r.entries ?? [])
 				this.checkpointSeq = Math.max(this.checkpointSeq, r.checkpointSeq ?? 0)
@@ -134,6 +149,7 @@ export class Collab {
 				}
 				this.members = r.members ?? []
 				this.onMembers(this.members)
+				this.showOthers()
 				this.maybeCheckpoint()
 				if ((r.entries ?? []).length) {
 					continue
@@ -145,6 +161,32 @@ export class Collab {
 				}
 			}
 			await sleep(document.hidden ? POLL_HIDDEN_MS : POLL_MS)
+		}
+	}
+
+	/** This person's position from GridLogic, for the others (sent with the next poll). */
+	setSelection(json) {
+		this.selection = String(json ?? '')
+	}
+
+	/** Where the others are, for GridLogic to draw on the grid. */
+	showOthers() {
+		const people = []
+		for (const m of this.members) {
+			if (m.client === this.client || !m.selection) {
+				continue
+			}
+			try {
+				const at = JSON.parse(m.selection)
+				people.push({ name: m.displayName || m.userId, color: colorFor(m.client), sheet: at.sheet, active: at.active, ranges: at.ranges ?? [] })
+			} catch {
+				// A garbled position: leave that person off the grid.
+			}
+		}
+		const json = JSON.stringify(people)
+		if (json !== this.shownOthers) {
+			this.shownOthers = json
+			this.post({ type: 'gridcraft:collab:presence', json })
 		}
 	}
 

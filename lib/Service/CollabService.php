@@ -21,6 +21,8 @@ class CollabService {
 	public const MAX_OP_BYTES = 16 * 1024 * 1024;
 	/** The most log entries per sync. */
 	public const MAX_BATCH = 500;
+	/** The largest position (selection) kept per member. */
+	public const MAX_SELECTION_BYTES = 8192;
 	/** Log entries kept before the last checkpoint, for members still catching up. */
 	public const KEEP_BEFORE_CHECKPOINT = 1000;
 	/** Client ids stay below 2^32: GridLogic puts them in the high half of new sheet ids. */
@@ -179,16 +181,20 @@ class CollabService {
 	}
 
 	/**
-	 * The log entries after `$since` (up to MAX_BATCH), who's in the session, and where the file
-	 * was last saved. `['rejoin' => true]` if the entries after `$since` are no longer kept.
+	 * The log entries after `$since` (up to MAX_BATCH), who's in the session and where, and where
+	 * the file was last saved. `$selection` is this member's position now (JSON, or '' if
+	 * unchanged). `['rejoin' => true]` if the entries after `$since` are no longer kept.
 	 */
-	public function sync(int $sessionId, int $client, string $userId, int $since): array {
+	public function sync(int $sessionId, int $client, string $userId, int $since, string $selection = ''): array {
 		$this->requireMember($sessionId, $client, $userId);
 		$now = $this->time->getTime();
 		$qb = $this->db->getQueryBuilder();
 		$qb->update('gridcraft_members')
-			->set('last_seen', $qb->createNamedParameter($now, IQueryBuilder::PARAM_INT))
-			->where($qb->expr()->eq('session_id', $qb->createNamedParameter($sessionId, IQueryBuilder::PARAM_INT)))
+			->set('last_seen', $qb->createNamedParameter($now, IQueryBuilder::PARAM_INT));
+		if ($selection !== '' && strlen($selection) <= self::MAX_SELECTION_BYTES && is_object(json_decode($selection))) {
+			$qb->set('selection', $qb->createNamedParameter($selection));
+		}
+		$qb->where($qb->expr()->eq('session_id', $qb->createNamedParameter($sessionId, IQueryBuilder::PARAM_INT)))
 			->andWhere($qb->expr()->eq('client', $qb->createNamedParameter($client, IQueryBuilder::PARAM_INT)))
 			->executeStatement();
 		$session = $this->sessionById($sessionId);
@@ -277,14 +283,19 @@ class CollabService {
 	/** @return list<array{client: int, userId: string, displayName: string}> */
 	private function activeMembers(int $sessionId, int $now): array {
 		$qb = $this->db->getQueryBuilder();
-		$qb->select('client', 'user_id', 'display_name')->from('gridcraft_members')
+		$qb->select('client', 'user_id', 'display_name', 'selection')->from('gridcraft_members')
 			->where($qb->expr()->eq('session_id', $qb->createNamedParameter($sessionId, IQueryBuilder::PARAM_INT)))
 			->andWhere($qb->expr()->gte('last_seen', $qb->createNamedParameter($now - self::ACTIVE_SECONDS, IQueryBuilder::PARAM_INT)))
 			->orderBy('client', 'ASC');
 		$out = [];
 		$rows = $qb->executeQuery();
 		while ($r = $rows->fetch()) {
-			$out[] = ['client' => (int)$r['client'], 'userId' => (string)$r['user_id'], 'displayName' => (string)$r['display_name']];
+			$out[] = [
+				'client' => (int)$r['client'],
+				'userId' => (string)$r['user_id'],
+				'displayName' => (string)$r['display_name'],
+				'selection' => (string)($r['selection'] ?? ''),
+			];
 		}
 		$rows->closeCursor();
 		return $out;

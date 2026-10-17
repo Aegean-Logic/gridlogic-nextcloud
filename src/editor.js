@@ -5,7 +5,7 @@
 import { getCurrentUser, getRequestToken } from '@nextcloud/auth'
 import { generateRemoteUrl } from '@nextcloud/router'
 
-import { Collab } from './collab.js'
+import { Collab, colorFor } from './collab.js'
 
 const root = document.getElementById('gridcraft-app')
 const status = document.getElementById('gridcraft-status')
@@ -192,6 +192,9 @@ function start() {
 		case 'gridcraft:collab:checkpointData':
 			collab?.received(message)
 			break
+		case 'gridcraft:collab:selection':
+			collab?.setSelection(message.json)
+			break
 		case 'gridcraft:collab:error':
 			console.warn('GridLogic co-editing:', message.error)
 			collab?.rejoin()
@@ -216,6 +219,45 @@ function start() {
 	root.appendChild(frame)
 }
 
+/** Who's editing, above the editor: each person in the colour they're drawn in on the grid. */
+function showPeople(members) {
+	let strip = document.getElementById('gridcraft-people')
+	if (!strip) {
+		strip = document.createElement('div')
+		strip.id = 'gridcraft-people'
+		strip.setAttribute('aria-label', "Who's editing")
+		root.prepend(strip)
+	}
+	const me = collab?.client
+	const sorted = [...members].sort((a, b) => (a.client === me ? -1 : b.client === me ? 1 : a.client - b.client))
+	const key = JSON.stringify(sorted.map((m) => [m.client, m.displayName]))
+	if (strip.dataset.key === key) {
+		return
+	}
+	strip.dataset.key = key
+	strip.replaceChildren(
+		Object.assign(document.createElement('span'), { className: 'label', textContent: sorted.length > 1 ? 'Editing now:' : 'Only you are editing' }),
+	)
+	if (sorted.length < 2) {
+		return
+	}
+	for (const m of sorted) {
+		const name = m.displayName || m.userId
+		const chip = document.createElement('span')
+		chip.className = 'person'
+		chip.style.setProperty('--person', colorFor(m.client))
+		chip.title = m.client === me ? `${name} (you)` : name
+		const initials = Object.assign(document.createElement('span'), { className: 'initials', textContent: initialsOf(name) })
+		chip.append(initials, document.createTextNode(m.client === me ? `${name} (you)` : name))
+		strip.append(chip)
+	}
+}
+
+function initialsOf(name) {
+	const parts = String(name).trim().split(/\s+/).filter(Boolean)
+	return ((parts[0]?.[0] ?? '?') + (parts.length > 1 ? parts[parts.length - 1][0] : '')).toUpperCase()
+}
+
 /** Opens the file in a co-editing session: everyone with it open edits the same workbook. */
 async function share(frame) {
 	collab = new Collab({
@@ -225,12 +267,8 @@ async function share(frame) {
 		headers,
 		notify,
 		onMembers(members) {
-			const before = others
 			others = Math.max(0, members.length - 1)
-			if (others > before) {
-				const names = members.filter((m) => m.client !== collab.client).map((m) => m.displayName || m.userId)
-				notify(`Editing with ${names.join(', ')}`)
-			}
+			showPeople(members)
 			showTitle()
 		},
 	})

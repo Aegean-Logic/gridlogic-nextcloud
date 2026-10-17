@@ -57,10 +57,10 @@ class CollabController extends Controller {
 
 	#[NoAdminRequired]
 	#[FrontpageRoute(verb: 'GET', url: '/collab/sync')]
-	public function sync(int $sessionId, int $client, int $since): DataResponse {
-		return $this->guard(function () use ($sessionId, $client, $since) {
+	public function sync(int $sessionId, int $client, int $since, string $sel = ''): DataResponse {
+		return $this->guard(function () use ($sessionId, $client, $since, $sel) {
 			$this->sessionFile($sessionId);
-			return $this->collab->sync($sessionId, $client, $this->uid(), $since);
+			return $this->collab->sync($sessionId, $client, $this->uid(), $since, $sel);
 		});
 	}
 

@@ -4,15 +4,52 @@
 
 #gridcraft-app {
 	position: relative;
+	display: flex;
+	flex-direction: column;
 	width: 100%;
 	height: 100%;
 }
 
 #gridcraft-app iframe {
 	display: block;
+	flex: 1;
+	min-height: 0;
 	width: 100%;
-	height: 100%;
 	border: 0;
+}
+
+/* Who's editing (co-editing). */
+#gridcraft-people {
+	display: flex;
+	flex-wrap: wrap;
+	align-items: center;
+	gap: 6px 12px;
+	padding: 4px 12px;
+	font-size: 13px;
+	border-bottom: 1px solid var(--color-border);
+	background: var(--color-main-background);
+	color: var(--color-text-maxcontrast);
+}
+
+#gridcraft-people .person {
+	display: inline-flex;
+	align-items: center;
+	gap: 6px;
+	color: var(--color-main-text);
+}
+
+#gridcraft-people .initials {
+	display: inline-flex;
+	align-items: center;
+	justify-content: center;
+	min-width: 22px;
+	height: 22px;
+	padding: 0 4px;
+	border-radius: 11px;
+	background: var(--person);
+	color: #fff;
+	font-size: 11px;
+	font-weight: bold;
 }
 
 #gridcraft-status {
