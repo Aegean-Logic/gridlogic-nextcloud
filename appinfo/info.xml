@@ -1,0 +1,16 @@
+<?xml version="1.0"?>
+<info xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" xsi:noNamespaceSchemaLocation="https://apps.nextcloud.com/schema/apps/info.xsd">
+	<id>gridcraft</id>
+	<name>GridCraft</name>
+	<summary>Open and edit spreadsheets in GridCraft</summary>
+	<description><![CDATA[Open .xlsx, .ods, .csv and other spreadsheets from Files in GridCraft, an open-source spreadsheet that runs in the browser. Saving writes the workbook back to Nextcloud.]]></description>
+	<version>0.1.0</version>
+	<licence>agpl</licence>
+	<author mail="info@aegeanlogic.co.uk">Aegean Logic</author>
+	<namespace>GridCraft</namespace>
+	<category>office</category>
+	<category>files</category>
+	<dependencies>
+		<nextcloud min-version="32" max-version="34"/>
+	</dependencies>
+</info>

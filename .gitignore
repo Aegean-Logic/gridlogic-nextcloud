@@ -1,0 +1,4 @@
+node_modules/
+# Build outputs: js/ from `npm run build`, editor/ from the GridCraft web build (see README).
+js/
+editor/
