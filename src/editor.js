@@ -6,6 +6,7 @@ import { getCurrentUser, getRequestToken } from '@nextcloud/auth'
 import { generateRemoteUrl } from '@nextcloud/router'
 
 import { Collab, colorFor } from './collab.js'
+import { sharing } from './share.js'
 
 const root = document.getElementById('gridcraft-app')
 const status = document.getElementById('gridcraft-status')
@@ -41,6 +42,8 @@ let shownName = fileName
 
 /** The co-editing session, once joined. */
 let collab = null
+/** Carries out the Share dialog's requests (made on first use). */
+let shareHandler = null
 /** Who else is in it. */
 let others = 0
 
@@ -192,6 +195,13 @@ function start() {
 		case 'gridcraft:collab:checkpointData':
 			collab?.received(message)
 			break
+		case 'gridcraft:cloud': {
+			// The Share dialog asks; Nextcloud answers.
+			shareHandler ??= sharing({ path, name: shownName, davUrl: davUrl(path) })
+			const reply = await shareHandler(message)
+			frame.contentWindow.postMessage(reply, location.origin)
+			break
+		}
 		case 'gridcraft:collab:selection':
 			collab?.setSelection(message.json)
 			break

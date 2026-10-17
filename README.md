@@ -30,6 +30,14 @@ GridLogic (by Aegean Logic, based on [GridCraft](https://github.com/storytold/gr
   can edit save the shared workbook.
 - **Charts, rules, notes:** two people adding a chart, a conditional-format rule or a note at
   once both keep theirs (they merge item by item).
+- **Sharing:** GridLogic's Share button opens a Share dialog like Excel's: add people, groups or
+  email addresses (Nextcloud's sharee search) with Can edit or Can view, add a message, and Send.
+  Copy link makes or updates the file's public link, with link settings for permission, password
+  and expiry. The people-with-access list changes or removes shares. The page carries the
+  dialog's requests out with Nextcloud's sharing API (`src/share.js`). The GridLogic desktop app
+  does the same after signing in to Nextcloud (GridLogic's `apps/gridcraft/src/nextcloud.rs`).
+  Email invitations need outgoing mail set up in Nextcloud (Administration settings › Basic
+  settings › Email server).
 
 Not yet: public share links, file locking (`files_lock`), Save As into another folder.
 
@@ -42,6 +50,7 @@ Not yet: public share links, file locking (`files_lock`), Save As into another f
 | `templates/editor.php`, `css/editor.css` | The editor page |
 | `src/editor.js` | The host page: WebDAV load/save and the GridLogic postMessage bridge |
 | `src/collab.js` | Co-editing: join, op push and polling, checkpoint saves |
+| `src/share.js` | The Share dialog's operations, through Nextcloud's sharing API |
 | `src/files.js` | The Files action |
 | `js/` | Bundles built from `src/` (`npm run build`) |
 | `editor/` | The GridLogic web build (`trunk build --release` in `gridcraft/apps/gridcraft-web`) |
