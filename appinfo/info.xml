@@ -4,7 +4,7 @@
 	<name>GridLogic</name>
 	<summary>Open and edit spreadsheets in GridLogic</summary>
 	<description><![CDATA[Open .xlsx, .ods, .csv and other spreadsheets from Files in GridLogic, an open-source spreadsheet that runs in the browser. Saving writes the workbook back to Nextcloud.]]></description>
-	<version>0.5.1</version>
+	<version>0.6.2</version>
 	<licence>agpl</licence>
 	<author homepage="https://www.aegeanlogic.co.uk">Aegean Logic</author>
 	<namespace>GridCraft</namespace>

@@ -8,7 +8,6 @@ use OCA\GridCraft\AppInfo\Application;
 use OCA\GridCraft\Service\CollabService;
 use OCA\GridCraft\Service\NotMemberException;
 use OCP\AppFramework\Controller;
-use OCP\AppFramework\Http;
 use OCP\AppFramework\Http\Attribute\FrontpageRoute;
 use OCP\AppFramework\Http\Attribute\NoAdminRequired;
 use OCP\AppFramework\Http\DataResponse;
@@ -22,6 +21,8 @@ use OCP\IUserSession;
  * (and, to push edits, write it).
  */
 class CollabController extends Controller {
+	use CollabResponses;
+
 	public function __construct(
 		IRequest $request,
 		private CollabService $collab,
@@ -50,7 +51,7 @@ class CollabController extends Controller {
 		return $this->guard(function () use ($sessionId, $client, $clientSeq, $base, $op) {
 			$node = $this->sessionFile($sessionId);
 			if (!$node->isUpdateable()) {
-				return new DataResponse(['error' => 'You can view this file but not edit it.'], Http::STATUS_FORBIDDEN);
+				return self::viewOnly();
 			}
 			return ['seq' => $this->collab->push($sessionId, $client, $this->uid(), $clientSeq, $base, $op)];
 		});
@@ -67,10 +68,10 @@ class CollabController extends Controller {
 
 	#[NoAdminRequired]
 	#[FrontpageRoute(verb: 'POST', url: '/collab/checkpoint')]
-	public function checkpoint(int $sessionId, int $client, int $seq, string $etag): DataResponse {
-		return $this->guard(function () use ($sessionId, $client, $seq, $etag) {
+	public function checkpoint(int $sessionId, int $client, int $seq, string $etag, string $sheetIds = ''): DataResponse {
+		return $this->guard(function () use ($sessionId, $client, $seq, $etag, $sheetIds) {
 			$this->sessionFile($sessionId);
-			$this->collab->checkpoint($sessionId, $client, $this->uid(), $seq, $etag);
+			$this->collab->checkpoint($sessionId, $client, $this->uid(), $seq, $etag, $sheetIds);
 			return [];
 		});
 	}
@@ -82,20 +83,6 @@ class CollabController extends Controller {
 			$this->collab->leave($sessionId, $client, $this->uid());
 			return [];
 		});
-	}
-
-	/** Runs `$f`, turning what it returns or throws into a JSON response. */
-	private function guard(callable $f): DataResponse {
-		try {
-			$out = $f();
-			return $out instanceof DataResponse ? $out : new DataResponse($out);
-		} catch (NotMemberException) {
-			return new DataResponse(['rejoin' => true], Http::STATUS_CONFLICT);
-		} catch (\InvalidArgumentException $e) {
-			return new DataResponse(['error' => $e->getMessage()], Http::STATUS_BAD_REQUEST);
-		} catch (NotAllowed $e) {
-			return new DataResponse(['error' => $e->getMessage()], Http::STATUS_NOT_FOUND);
-		}
 	}
 
 	private function uid(): string {

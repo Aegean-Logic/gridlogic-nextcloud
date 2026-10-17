@@ -25,6 +25,8 @@ class CollabService {
 	public const MAX_SELECTION_BYTES = 8192;
 	/** Log entries kept before the last checkpoint, for members still catching up. */
 	public const KEEP_BEFORE_CHECKPOINT = 1000;
+	/** The largest list of sheet ids kept with a checkpoint (JSON text). */
+	public const MAX_SHEET_IDS_BYTES = 65536;
 	/** Client ids stay below 2^32: GridLogic puts them in the high half of new sheet ids. */
 	private const MAX_CLIENT = 4294967295;
 
@@ -38,7 +40,8 @@ class CollabService {
 	 * Joins the session for a file, starting one if there's none. `$etag` is the file's ETag as
 	 * the joiner loaded it. Returns `['retry' => true]` if the file was saved for the session
 	 * after that (load it again), otherwise the session, the joiner's client id, the log
-	 * position the loaded file is at, and the log entries after it.
+	 * position the loaded file is at, the session's ids for the file's sheets (JSON, or '' to
+	 * keep the file's), and the log entries after it.
 	 */
 	public function join(int $fileId, string $etag, string $userId, string $displayName, bool $canEdit = true): array {
 		$etag = self::bareEtag($etag);
@@ -106,6 +109,7 @@ class CollabService {
 			$qb->update('gridcraft_sessions')
 				->set('checkpoint_seq', 'last_seq')
 				->set('checkpoint_etag', $qb->createNamedParameter($etag))
+				->set('checkpoint_sheets', $qb->createNamedParameter(null, IQueryBuilder::PARAM_NULL))
 				->where($qb->expr()->eq('id', $qb->createNamedParameter($id, IQueryBuilder::PARAM_INT)))
 				->executeStatement();
 			$session = $this->sessionByFile($fileId) ?? $session;
@@ -126,6 +130,7 @@ class CollabService {
 			'sessionId' => $id,
 			'client' => $client,
 			'seq' => $from,
+			'sheetIds' => (string)($session['checkpoint_sheets'] ?? ''),
 			'entries' => $this->entries($id, $from, PHP_INT_MAX),
 			'members' => $this->activeMembers($id, $now),
 		];
@@ -212,13 +217,20 @@ class CollabService {
 		];
 	}
 
-	/** Records that the file was saved for the session at log position `$seq` with `$etag`. */
-	public function checkpoint(int $sessionId, int $client, string $userId, int $seq, string $etag): void {
+	/**
+	 * Records that the file was saved for the session at log position `$seq` with `$etag`;
+	 * `$sheetIds` (JSON: a list of ids) are its sheets' ids in the session, which the file doesn't
+	 * keep.
+	 */
+	public function checkpoint(int $sessionId, int $client, string $userId, int $seq, string $etag, string $sheetIds = ''): void {
 		$this->requireMember($sessionId, $client, $userId);
 		$qb = $this->db->getQueryBuilder();
 		$qb->update('gridcraft_sessions')
 			->set('checkpoint_seq', $qb->createNamedParameter($seq, IQueryBuilder::PARAM_INT))
 			->set('checkpoint_etag', $qb->createNamedParameter(self::bareEtag($etag)))
+			->set('checkpoint_sheets', self::sheetIds($sheetIds) === null
+				? $qb->createNamedParameter(null, IQueryBuilder::PARAM_NULL)
+				: $qb->createNamedParameter($sheetIds))
 			->where($qb->expr()->eq('id', $qb->createNamedParameter($sessionId, IQueryBuilder::PARAM_INT)))
 			->andWhere($qb->expr()->lt('checkpoint_seq', $qb->createNamedParameter($seq, IQueryBuilder::PARAM_INT)))
 			->andWhere($qb->expr()->lte($qb->createNamedParameter($seq, IQueryBuilder::PARAM_INT), 'last_seq'))
@@ -243,6 +255,23 @@ class CollabService {
 	public function fileOf(int $sessionId): ?int {
 		$s = $this->sessionById($sessionId);
 		return $s === null ? null : (int)$s['file_id'];
+	}
+
+	/** `$json` if it's a list of sheet ids (whole numbers from 1), else null. */
+	private static function sheetIds(string $json): ?array {
+		if ($json === '' || strlen($json) > self::MAX_SHEET_IDS_BYTES) {
+			return null;
+		}
+		$ids = json_decode($json, false, 2, JSON_BIGINT_AS_STRING);
+		if (!is_array($ids) || $ids === []) {
+			return null;
+		}
+		foreach ($ids as $id) {
+			if (!(is_int($id) && $id > 0) && !(is_string($id) && preg_match('/^[1-9][0-9]{0,19}$/', $id))) {
+				return null;
+			}
+		}
+		return $ids;
 	}
 
 	/** An ETag without the quotes WebDAV puts around it. */

@@ -6,6 +6,7 @@ namespace OCA\GridCraft\AppInfo;
 
 use OCA\Files\Event\LoadAdditionalScriptsEvent;
 use OCA\GridCraft\Listener\LoadFilesScripts;
+use OCA\GridCraft\Share\EditorPageProvider;
 use OCP\AppFramework\App;
 use OCP\AppFramework\Bootstrap\IBootContext;
 use OCP\AppFramework\Bootstrap\IBootstrap;
@@ -21,6 +22,8 @@ class Application extends App implements IBootstrap {
 	public function register(IRegistrationContext $context): void {
 		// The Files app loads our "Open in GridLogic" action.
 		$context->registerEventListener(LoadAdditionalScriptsEvent::class, LoadFilesScripts::class);
+		// A shared link to a spreadsheet opens in GridLogic.
+		$context->registerPublicShareTemplateProvider(EditorPageProvider::class);
 	}
 
 	public function boot(IBootContext $context): void {

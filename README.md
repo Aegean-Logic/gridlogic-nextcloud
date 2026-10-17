@@ -39,14 +39,24 @@ GridLogic (by Aegean Logic, based on [GridCraft](https://github.com/storytold/gr
   Email invitations need outgoing mail set up in Nextcloud (Administration settings › Basic
   settings › Email server).
 
-Not yet: public share links, file locking (`files_lock`), Save As into another folder.
+- **Shared links:** a link to a spreadsheet (`/s/{token}`, link or email share) opens in
+  GridLogic, as a OneDrive link opens in Excel for the web (`lib/Share/EditorPageProvider.php`).
+  An edit link lets people edit together with everyone who has the file open, signed-in users
+  included. They show as guests under the name they gave Nextcloud. A view-only link follows
+  live but can't change anything. Nextcloud checks the link first, including a password, and
+  the page reads and writes the file through the link's WebDAV address. Co-editing goes through
+  `/apps/gridcraft/s/{token}/collab/*` (`PublicCollabController`). There, membership is a random
+  key handed out on join, never stored (only its hash). Guests' Share button copies the link.
+
+Not yet: links to folders (their spreadsheets open in Nextcloud's own viewer), file locking
+(`files_lock`), Save As into another folder.
 
 ## Layout
 
 | Path | What |
 |---|---|
 | `appinfo/info.xml` | App manifest |
-| `lib/` | `Application` (Files hook), `EditorController` (`/edit` page and its CSP), `CollabController` + `Service/CollabService` (the co-editing sequencer), `Migration/` (its tables), listener |
+| `lib/` | `Application` (Files hook, share page provider), `EditorController` (`/edit` page and its CSP), `Share/EditorPageProvider` (shared links), `CollabController`, `PublicCollabController` + `Service/CollabService` (the co-editing sequencer), `Migration/` (its tables), listener |
 | `templates/editor.php`, `css/editor.css` | The editor page |
 | `src/editor.js` | The host page: WebDAV load/save and the GridLogic postMessage bridge |
 | `src/collab.js` | Co-editing: join, op push and polling, checkpoint saves |

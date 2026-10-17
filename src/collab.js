@@ -1,9 +1,8 @@
 // Co-editing for the editor page. GridLogic (in the iframe) does all the merging; this module
-// carries ops between it and the app's sequencer (`/apps/gridcraft/collab/*`) and saves the
+// carries ops between it and the app's sequencer (`/apps/gridcraft/collab/*`, or through a
+// shared link `/apps/gridcraft/s/{token}/collab/*`) and saves the
 // shared workbook back to the file now and then (a checkpoint), so the file keeps up and people
 // joining later start from it. Protocol: gridcraft/packaging/web/README.md.
-
-import { generateUrl } from '@nextcloud/router'
 
 /** Save the shared workbook after this many log entries… */
 const CHECKPOINT_OPS = 20
@@ -30,9 +29,13 @@ export class Collab {
 	 * @param {(extra?: object) => object} o.headers request headers (with the request token)
 	 * @param {(text: string, error?: boolean) => void} o.notify a message for the person
 	 * @param {(members: object[]) => void} o.onMembers who's in the session
+	 * @param {string} o.endpoint the sequencer's URL (`…/collab`)
+	 * @param {object} o.joinParams more for joining (a link visitor's name)
 	 */
-	constructor({ frame, fileId, fileUrl, headers, notify, onMembers }) {
-		Object.assign(this, { frame, fileId, fileUrl, headers, notify, onMembers })
+	constructor({ frame, fileId, fileUrl, headers, notify, onMembers, endpoint, joinParams = {} }) {
+		Object.assign(this, { frame, fileId, fileUrl, headers, notify, onMembers, endpoint, joinParams })
+		/** A link visitor's proof of membership, from joining (sent with every call). */
+		this.key = ''
 		this.sessionId = 0
 		this.client = 0
 		this.lastSeq = 0
@@ -54,32 +57,37 @@ export class Collab {
 
 	/** Loads the file and joins its session. Resolves to the file's bytes once GridLogic can open them. */
 	async join() {
-		for (let attempt = 0; attempt < 5; attempt++) {
+		for (let attempt = 0; attempt < 6; attempt++) {
 			const response = await fetch(this.fileUrl, { headers: this.headers(), credentials: 'same-origin' })
 			if (!response.ok) {
 				throw new Error(`${response.status} ${response.statusText}`)
 			}
 			const etag = bare(response.headers.get('ETag') ?? '')
 			const bytes = await response.arrayBuffer()
-			const joined = await this.call('POST', 'join', { fileId: this.fileId, etag })
+			const joined = await this.call('POST', 'join', { fileId: this.fileId, etag, ...this.joinParams })
 			if (joined.retry) {
-				// Saved for the session since this copy was fetched: fetch it again.
+				// Saved for the session since this copy was fetched: fetch it again, giving a
+				// save in progress time to finish.
+				await sleep(400 * 2 ** attempt)
 				continue
 			}
-			Object.assign(this, { sessionId: joined.sessionId, client: joined.client, canEdit: joined.canEdit !== false })
+			Object.assign(this, { sessionId: joined.sessionId, client: joined.client, canEdit: joined.canEdit !== false, key: joined.key ?? '' })
 			this.checkpointSeq = joined.seq
 			this.checkpointEtag = etag
 			this.lastSeq = joined.seq
 			this.members = joined.members ?? []
 			this.onMembers(this.members)
-			return { bytes, seq: joined.seq, entries: joined.entries ?? [] }
+			return { bytes, seq: joined.seq, sheetIds: joined.sheetIds ?? '', entries: joined.entries ?? [] }
 		}
 		throw new Error('the file keeps changing; try again in a moment')
 	}
 
-	/** After GridLogic opened the file: start sharing and catching up. */
-	start(seq, entries) {
-		this.post({ type: 'gridcraft:collab:start', client: this.client, seq, readOnly: !this.canEdit })
+	/**
+	 * After GridLogic opened the file: start sharing and catching up. `sheetIds`: the session's
+	 * ids for the file's sheets, kept with the checkpoint (the file doesn't keep them).
+	 */
+	start(seq, entries, sheetIds = '') {
+		this.post({ type: 'gridcraft:collab:start', client: this.client, seq, readOnly: !this.canEdit, json: sheetIds })
 		this.deliver(entries)
 		if (!this.canEdit) {
 			this.notify('You can view this file but not edit it.')
@@ -261,7 +269,7 @@ export class Collab {
 			throw new Error(`Nextcloud answered ${response.status} ${response.statusText}`)
 		}
 		const etag = bare(response.headers.get('OC-ETag') ?? response.headers.get('ETag') ?? '')
-		await this.call('POST', 'checkpoint', { sessionId: this.sessionId, client: this.client, seq: data.seq, etag })
+		await this.call('POST', 'checkpoint', { sessionId: this.sessionId, client: this.client, seq: data.seq, etag, sheetIds: data.sheetIds })
 		this.checkpointSeq = data.seq
 		this.checkpointEtag = etag
 		this.firstUnsavedAt = this.lastSeq > data.seq ? Date.now() : 0
@@ -286,7 +294,7 @@ export class Collab {
 		const w = this.waiting.get(message.id)
 		if (w) {
 			this.waiting.delete(message.id)
-			w.resolve({ seq: message.seq, bytes: message.bytes })
+			w.resolve({ seq: message.seq, bytes: message.bytes, sheetIds: String(message.sheetIds ?? '') })
 		}
 	}
 
@@ -309,12 +317,12 @@ export class Collab {
 		if (!this.sessionId) {
 			return
 		}
-		fetch(generateUrl('/apps/gridcraft/collab/leave'), {
+		fetch(`${this.endpoint}/leave`, {
 			method: 'POST',
 			keepalive: true,
 			credentials: 'same-origin',
 			headers: this.headers({ 'Content-Type': 'application/json' }),
-			body: JSON.stringify({ sessionId: this.sessionId, client: this.client }),
+			body: JSON.stringify(this.withKey({ sessionId: this.sessionId, client: this.client })),
 		}).catch(() => {})
 	}
 
@@ -322,9 +330,15 @@ export class Collab {
 		this.frame.contentWindow?.postMessage(message, location.origin)
 	}
 
+	/** A call's parameters, with a link visitor's key. */
+	withKey(params) {
+		return this.key ? { ...params, key: this.key } : params
+	}
+
 	/** A call to the sequencer; throws an Error with `status` on failure. */
 	async call(method, endpoint, params) {
-		let url = generateUrl(`/apps/gridcraft/collab/${endpoint}`)
+		params = this.withKey(params)
+		let url = `${this.endpoint}/${endpoint}`
 		const init = { method, credentials: 'same-origin', headers: this.headers({ Accept: 'application/json' }) }
 		if (method === 'GET') {
 			url += '?' + new URLSearchParams(params).toString()

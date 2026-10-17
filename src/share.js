@@ -164,7 +164,26 @@ export function sharing({ path, name, davUrl }) {
 		},
 	}
 
-	/** Carries out one operation; resolves to the reply message for GridLogic. */
+	return handler(ops)
+}
+
+/**
+ * The Share dialog for someone who opened a shared link: they can't share the file themselves,
+ * only pass the link on.
+ * @param {object} o
+ * @param {string} o.name the workbook's name
+ * @param {string} o.link the shared link
+ */
+export function guestSharing({ name, link }) {
+	return handler({
+		async 'share.info'() {
+			return { name, signedIn: true, inCloud: true, canShare: false, link }
+		},
+	})
+}
+
+/** Carries out the dialog's operations with `ops`; each resolves to the reply for GridLogic. */
+function handler(ops) {
 	return async function handle({ id, op, params }) {
 		try {
 			const run = ops[op]
