@@ -15,8 +15,8 @@ trait CollabResponses {
 		try {
 			$out = $f();
 			return $out instanceof DataResponse ? $out : new DataResponse($out);
-		} catch (NotMemberException) {
-			return new DataResponse(['rejoin' => true], Http::STATUS_CONFLICT);
+		} catch (NotMemberException $e) {
+			return new DataResponse($e->outdated ? ['rejoin' => true, 'outdated' => true] : ['rejoin' => true], Http::STATUS_CONFLICT);
 		} catch (\InvalidArgumentException $e) {
 			return new DataResponse(['error' => $e->getMessage()], Http::STATUS_BAD_REQUEST);
 		} catch (NotAllowed $e) {

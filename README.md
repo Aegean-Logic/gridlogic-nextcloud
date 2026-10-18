@@ -25,6 +25,16 @@ GridLogic (by Aegean Logic, based on [GridCraft](https://github.com/storytold/gr
   strip above the editor lists who's editing (positions travel with each poll and are kept in
   `gridcraft_members.selection`).
 - **Undo:** Undo and Redo take back a person's own edits only, never someone else's later change.
+- **One protocol per session:** each copy joins (`POST join {fileId, etag, build}`) saying what its
+  edits mean: GridLogic's co-editing protocol, which the editor's `gridcraft:ready` gives as
+  `collab` (a number; `true` from builds before it, protocol 1) and the desktop app sends its own.
+  Never the app version, which the desktop app doesn't share. The server keeps the newest per
+  session (`gridcraft_sessions.build`, `gridcraft_members.build`), answers it in join's `build`
+  (a copy on an older one leaves), and answers any member on an older one 409 `{rejoin: true,
+  outdated: true}`, so a tab left open across an upgrade reloads with the new GridLogic before it
+  misreads the others' edits or saves its copy over them. A page reloads for that at most once a
+  minute, then says why (a desktop app newer than this server's editor), and the desktop app on
+  an older protocol stops sharing with a message.
 - **View-only access:** someone who can read but not write the file follows the others live; an
   edit they try is taken back with a message (and the server refuses it too). Only members who
   can edit save the shared workbook.

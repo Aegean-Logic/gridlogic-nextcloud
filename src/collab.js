@@ -20,6 +20,32 @@ export function colorFor(client) {
 const POLL_MS = 600
 const POLL_HIDDEN_MS = 3000
 
+/** Said when someone edits with a GridLogic whose edits this page's would misread. */
+const OUTDATED = 'Someone is editing this workbook with a newer GridLogic than this page has, so you can\'t edit it together here yet. Your edits since you joined weren\'t shared. Try again once the GridLogic app in Nextcloud is updated.'
+
+/** Whether build `a` (a co-editing protocol, `"1"`) is newer than `b`. */
+function newer(a, b) {
+	const [x, y] = [Number(a), Number(b)]
+	return Number.isFinite(x) && Number.isFinite(y) && x > y
+}
+
+/**
+ * Whether to reload for `key`: yes, unless this tab already reloaded for it in the last minute
+ * (a reload that didn't help would only repeat).
+ */
+function reloadOnce(key) {
+	try {
+		const last = Number(sessionStorage.getItem(key) ?? 0)
+		if (Date.now() - last < 60_000) {
+			return false
+		}
+		sessionStorage.setItem(key, String(Date.now()))
+	} catch {
+		// No storage (a private window): reload, as before.
+	}
+	return true
+}
+
 export class Collab {
 	/**
 	 * @param {object} o
@@ -31,9 +57,11 @@ export class Collab {
 	 * @param {(members: object[]) => void} o.onMembers who's in the session
 	 * @param {string} o.endpoint the sequencer's URL (`…/collab`)
 	 * @param {object} o.joinParams more for joining (a link visitor's name)
+	 * @param {string} o.build what the editor's edits mean (its co-editing protocol): the server sends
+	 *   members of an older one back to reload, so every copy in a session reads the edits alike
 	 */
-	constructor({ frame, fileId, fileUrl, headers, notify, onMembers, endpoint, joinParams = {} }) {
-		Object.assign(this, { frame, fileId, fileUrl, headers, notify, onMembers, endpoint, joinParams })
+	constructor({ frame, fileId, fileUrl, headers, notify, onMembers, endpoint, joinParams = {}, build = '' }) {
+		Object.assign(this, { frame, fileId, fileUrl, headers, notify, onMembers, endpoint, joinParams, build })
 		/** A link visitor's proof of membership, from joining (sent with every call). */
 		this.key = ''
 		this.sessionId = 0
@@ -66,7 +94,7 @@ export class Collab {
 			}
 			const etag = bare(response.headers.get('ETag') ?? '')
 			const bytes = await response.arrayBuffer()
-			const joined = await this.call('POST', 'join', { fileId: this.fileId, etag, ...this.joinParams })
+			const joined = await this.call('POST', 'join', { fileId: this.fileId, etag, build: this.build, ...this.joinParams })
 			if (joined.retry) {
 				// Saved for the session since this copy was fetched: fetch it again, giving a
 				// save in progress time to finish.
@@ -74,6 +102,12 @@ export class Collab {
 				continue
 			}
 			Object.assign(this, { sessionId: joined.sessionId, client: joined.client, canEdit: joined.canEdit !== false, key: joined.key ?? '' })
+			if (newer(joined.build, this.build)) {
+				// Someone edits with a GridLogic whose edits this one would misread (a desktop app
+				// newer than this server's editor): not together.
+				await this.call('POST', 'leave', { sessionId: this.sessionId, client: this.client }).catch(() => {})
+				throw new Error(OUTDATED)
+			}
 			this.checkpointSeq = joined.seq
 			this.checkpointEtag = etag
 			this.lastSeq = joined.seq
@@ -129,7 +163,7 @@ export class Collab {
 					this.notify('You can view this file but not edit it: your changes aren\'t shared.', true)
 					this.outbox.length = 0
 				} else if (e.status === 409) {
-					this.rejoin()
+					this.rejoin(e.outdated)
 				} else if (e.status === 400) {
 					// Refused for good (too large, or malformed): retrying can't help, and this
 					// copy now differs from everyone else's, so start again from the file.
@@ -152,7 +186,7 @@ export class Collab {
 				const sel = this.selection !== this.sentSelection ? this.selection : ''
 				const r = await this.call('GET', 'sync', { sessionId: this.sessionId, client: this.client, since: this.lastSeq, sel })
 				if (r.rejoin) {
-					this.rejoin()
+					this.rejoin(r.outdated === true)
 					return
 				}
 				if (sel) {
@@ -172,7 +206,7 @@ export class Collab {
 				}
 			} catch (e) {
 				if (e.status === 409) {
-					this.rejoin()
+					this.rejoin(e.outdated)
 					return
 				}
 			}
@@ -300,12 +334,21 @@ export class Collab {
 		}
 	}
 
-	/** GridLogic can't follow the log (or the server forgot this copy): start again from the file. */
-	rejoin() {
+	/**
+	 * GridLogic can't follow the log (or the server forgot this copy): start again from the file.
+	 * `outdated`: a newer GridLogic joined, whose edits this one would misread; the reloaded page
+	 * brings the newer one. If it doesn't (a desktop app newer than this server's editor), say so
+	 * rather than reload again and again.
+	 */
+	rejoin(outdated = false) {
 		if (this.stopped) {
 			return
 		}
 		this.stop()
+		if (outdated && !reloadOnce(`gridcraft:outdated:${this.fileId}`)) {
+			this.notify(OUTDATED, true)
+			return
+		}
 		this.notify('Reconnecting to the shared workbook…')
 		setTimeout(() => location.reload(), 1500)
 	}
@@ -355,6 +398,7 @@ export class Collab {
 			e.status = response.status
 			if (body.rejoin) {
 				e.status = 409
+				e.outdated = body.outdated === true
 			}
 			throw e
 		}
