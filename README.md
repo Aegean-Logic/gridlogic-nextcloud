@@ -85,6 +85,17 @@ GridLogic (by Aegean Logic, based on [GridCraft](https://github.com/storytold/gr
   and GridLogic asks whether to share it with them first ("Share and notify"). Turn the emails off
   with `occ config:app:set gridcraft mention_email --value=no`. Design: Aegean Office
   `docs/mentions.md`.
+- **Chat and calls (Nextcloud Talk):** when Talk is installed, Chat and Call buttons sit above
+  the editor. Chat opens a panel beside it with the conversation Talk keeps for the file (the
+  same one as the Files sidebar's Chat tab and Talk itself), for everyone the file is shared with
+  and guests on a link to the file (not a link to a folder). `@` in the chat lists the people
+  Talk offers. Call starts or joins the file's call in a Talk window (`/call/<token>#direct-call`);
+  the button turns green while a call is going on, and Chat shows the unread count. Two gaps in
+  Talk are filled through `POST /apps/gridcraft/mention` (`where: chat` or `call`): someone
+  @mentioned who wasn't in the chat yet loses Talk's notification, and Talk sends no call
+  notifications for a file's conversation, so this app tells them instead, with a link that opens
+  the workbook with the chat open (`?chat=1`). Without Talk, or for a file shared with nobody, the
+  buttons don't appear or the panel says to share the file. Design: Aegean Office `docs/talk.md`.
 
 Not yet: file locking (`files_lock`), Save As into another folder.
 
@@ -98,6 +109,7 @@ Not yet: file locking (`files_lock`), Save As into another folder.
 | `src/editor.js` | The host page: WebDAV load/save and the GridLogic postMessage bridge |
 | `src/collab.js` | Co-editing: join, op push and polling, checkpoint saves |
 | `src/share.js` | The Share dialog's operations, through Nextcloud's sharing API |
+| `src/talk.js`, `css/talk.css` | Chat and calls about the file through Nextcloud Talk (the same in the three apps) |
 | `src/files.js` | The Files action |
 | `js/` | Bundles built from `src/` (`npm run build`) |
 | `editor/` | The GridLogic web build (`trunk build --release` in `gridcraft/apps/gridcraft-web`) |

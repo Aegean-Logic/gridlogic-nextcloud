@@ -66,6 +66,7 @@ class EditorPageProvider implements IPublicShareTemplateProvider {
 		$canEdit = ($share->getPermissions() & Constants::PERMISSION_UPDATE) !== 0 && $file->isUpdateable();
 		Util::addScript(Application::APP_ID, 'gridcraft-editor');
 		Util::addStyle(Application::APP_ID, 'editor');
+		Util::addStyle(Application::APP_ID, 'talk');
 		$response = new PublicTemplateResponse(Application::APP_ID, 'editor', [
 			'path' => '',
 			'fileId' => $file->getId(),
