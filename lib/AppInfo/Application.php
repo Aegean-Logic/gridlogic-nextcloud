@@ -8,6 +8,7 @@ use OCA\Files\Event\LoadAdditionalScriptsEvent;
 use OCA\Files_Sharing\Event\BeforeTemplateRenderedEvent;
 use OCA\GridCraft\Listener\LoadFilesScripts;
 use OCA\GridCraft\Listener\LoadPublicFolderScripts;
+use OCA\GridCraft\Notification\Notifier;
 use OCA\GridCraft\Share\EditorPageProvider;
 use OCP\AppFramework\App;
 use OCP\AppFramework\Bootstrap\IBootContext;
@@ -28,6 +29,8 @@ class Application extends App implements IBootstrap {
 		$context->registerPublicShareTemplateProvider(EditorPageProvider::class);
 		// A link to a folder: its spreadsheets open in GridLogic too.
 		$context->registerEventListener(BeforeTemplateRenderedEvent::class, LoadPublicFolderScripts::class);
+		// @mentions in comments.
+		$context->registerNotifierService(Notifier::class);
 	}
 
 	public function boot(IBootContext $context): void {

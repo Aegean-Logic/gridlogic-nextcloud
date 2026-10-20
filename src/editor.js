@@ -166,6 +166,11 @@ function start() {
 		// The workbook can carry on in GridLogic on this computer (Open in Desktop App).
 		params.desktop = '1'
 	}
+	// A mention's link names its comment: GridLogic opens it once the workbook is in.
+	const comment = new URLSearchParams(location.search).get('comment')
+	if (comment) {
+		params.comment = comment.slice(0, 300)
+	}
 	for (const [key, value] of Object.entries(params)) {
 		editorUrl.searchParams.set(key, value)
 	}
@@ -225,10 +230,11 @@ function start() {
 			collab?.received(message)
 			break
 		case 'gridcraft:cloud': {
-			// The Share dialog asks; Nextcloud answers. Guests on a link can only pass the link on.
+			// The Share dialog and @mentions ask; Nextcloud answers. Guests on a link can only pass
+			// the link on.
 			shareHandler ??= viaLink
 				? guestSharing({ name: shownName, link: `${location.origin}${location.pathname}` })
-				: sharing({ path, name: shownName, davUrl: davUrl(path) })
+				: sharing({ path, name: shownName, davUrl: davUrl(path), fileId })
 			const reply = await shareHandler(message)
 			frame.contentWindow.postMessage(reply, location.origin)
 			break

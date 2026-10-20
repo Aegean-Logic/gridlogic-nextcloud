@@ -77,6 +77,14 @@ GridLogic (by Aegean Logic, based on [GridCraft](https://github.com/storytold/gr
   spreadsheet's Files menu. Both open the file in the desktop app with a
   `gridlogic://open?server=…&path=…` link (the installers register the scheme on Windows and
   Linux, not yet on macOS). The app signs in to that Nextcloud first if it needs to.
+- **@mentions:** typing `@` in a comment lists Nextcloud users (the sharees API, so the server's
+  sharing rules apply). Posting the comment calls `POST /apps/gridcraft/mention {fileId, people,
+  text, anchor}` (60 an hour per user, at most 20 people a comment): each person who can open the
+  file gets a notification and an email with the comment and a link that opens the workbook at it
+  (`/apps/gridcraft/edit?path=…&comment=<anchor>`). People who can't open it come back as `noAccess`,
+  and GridLogic asks whether to share it with them first ("Share and notify"). Turn the emails off
+  with `occ config:app:set gridcraft mention_email --value=no`. Design: Aegean Office
+  `docs/mentions.md`.
 
 Not yet: file locking (`files_lock`), Save As into another folder.
 

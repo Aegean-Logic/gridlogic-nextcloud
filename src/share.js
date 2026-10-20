@@ -1,9 +1,10 @@
-// Sharing for GridLogic's Share dialog: the operations of its cloud (gridcraft_ui_egui::share::
-// Cloud), carried out with Nextcloud's sharing API for the file that's open. GridLogic draws the
-// dialog; this only talks to Nextcloud.
+// Sharing for GridLogic's Share dialog and its @mentions: the operations of its cloud
+// (gridcraft_ui_egui::share::Cloud, gridcraft_ui_egui::mentions), carried out with Nextcloud's
+// sharing API and this app's /mention route for the file that's open. GridLogic draws the dialog
+// and the people list; this only talks to Nextcloud.
 
 import { getRequestToken } from '@nextcloud/auth'
-import { generateOcsUrl } from '@nextcloud/router'
+import { generateOcsUrl, generateUrl } from '@nextcloud/router'
 
 const TYPE = { user: 0, group: 1, link: 3, email: 4, remote: 6, team: 7 }
 const NAME = Object.fromEntries(Object.entries(TYPE).map(([k, v]) => [v, k]))
@@ -16,8 +17,9 @@ const EDIT = 3
  * @param {string} o.path the file, relative to the user's files
  * @param {string} o.name its name
  * @param {string} o.davUrl its WebDAV URL
+ * @param {number} o.fileId its Nextcloud file id (0 when unknown: no mentions)
  */
-export function sharing({ path, name, davUrl }) {
+export function sharing({ path, name, davUrl, fileId }) {
 	const sharePath = '/' + path.replace(/^\/+/, '')
 
 	async function ocs(method, endpoint, params = {}) {
@@ -82,7 +84,41 @@ export function sharing({ path, name, davUrl }) {
 
 	const ops = {
 		async 'share.info'() {
-			return { name, signedIn: true, inCloud: true, canShare: await canShare() }
+			return { name, signedIn: true, inCloud: true, canShare: await canShare(), mentions: fileId > 0 }
+		},
+
+		// People to @mention: users the sharing rules let this person find.
+		async 'people.search'({ query }) {
+			const data = await ocs('GET', 'sharees', { search: query ?? '', itemType: 'file', lookup: 'false', perPage: 10, shareType: [TYPE.user] })
+			const out = []
+			const seen = new Set()
+			for (const bucket of [data?.exact ?? {}, data ?? {}]) {
+				for (const e of bucket.users ?? []) {
+					const id = e.value?.shareWith
+					if (!id || seen.has(id)) {
+						continue
+					}
+					seen.add(id)
+					const unique = e.shareWithDisplayNameUnique
+					out.push({ id, name: e.label || id, email: unique && unique.includes('@') && unique !== id ? unique : null })
+				}
+			}
+			return out
+		},
+
+		// Tells the people mentioned in a comment; the server checks each can open the file.
+		async 'mention.notify'({ people, text, anchor }) {
+			const response = await fetch(generateUrl('/apps/gridcraft/mention'), {
+				method: 'POST',
+				credentials: 'same-origin',
+				headers: { requesttoken: getRequestToken() ?? '', 'Content-Type': 'application/json', Accept: 'application/json' },
+				body: JSON.stringify({ fileId, people: people ?? [], text: text ?? '', anchor: anchor ?? '' }),
+			})
+			const body = await response.json().catch(() => null)
+			if (!response.ok) {
+				throw new Error(body?.error || `Nextcloud answered ${response.status} ${response.statusText}`)
+			}
+			return body
 		},
 
 		async 'share.search'({ query }) {
